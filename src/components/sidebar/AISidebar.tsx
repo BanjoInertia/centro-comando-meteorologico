@@ -1,21 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { useStationSelect } from "@/hooks/useStationSelect";
 import { AnimatePresence, motion, Variants } from "framer-motion";
 import {
   Loader2, Star, Route, X, Navigation, Plane, Ruler,
   ChevronRight, Search, Wind, Thermometer, Eye, Gauge,
-  Cloud, AlertTriangle
+  Cloud, AlertTriangle, BotOff, RefreshCw
 } from "lucide-react";
 import type { MetarData } from "@/types";
 import AlertList from "../alerts/AlertList";
 import Badge from "../ui/Badge";
 import { BRAZILIAN_AIRPORTS } from "@/data/airports";
+import { parseTafAtHour } from "@/lib/weather/taf-parser";
 
 // =============================================================================
-// Region mapping
+// Mapeamento de Regiões
 // =============================================================================
 
 const REGION_ORDER: Record<string, string> = {
@@ -107,10 +108,10 @@ export default function AISidebar() {
   const isSidebarOpen = useAppStore((s) => s.isSidebarOpen);
   const station = useAppStore((s) => s.selectedStation);
   const currentHourOffset = useAppStore((s) => s.timeline.currentHourOffset);
-  const isPlaying = useAppStore((s) => s.timeline.isPlaying);
   const favoriteIcaos = useAppStore((s) => s.favoriteIcaos);
   const toggleFavorite = useAppStore((s) => s.toggleFavorite);
-  const flightCategories = useAppStore((s) => s.flightCategories);
+  const setProjectedFlightCategory = useAppStore((s) => s.setProjectedFlightCategory);
+
   const routeMode = useAppStore((s) => s.routeMode);
   const routeOrigin = useAppStore((s) => s.routeOrigin);
   const routeDestination = useAppStore((s) => s.routeDestination);
@@ -119,44 +120,8 @@ export default function AISidebar() {
   const clearRoute = useAppStore((s) => s.clearRoute);
   const clearStation = useAppStore((s) => s.clearStation);
 
-  const { selectAirport, updateBriefingForHour } = useStationSelect();
+  const { selectAirport } = useStationSelect();
   const [searchQuery, setSearchQuery] = useState("");
-
-  const previousIcaoRef = useRef<string | null>(null);
-  const previousHourRef = useRef(currentHourOffset);
-
-  useEffect(() => {
-    if (!station || station.status === "fetching-metar") return;
-
-    if (previousIcaoRef.current !== station.airport.icao) {
-      previousIcaoRef.current = station.airport.icao;
-      previousHourRef.current = currentHourOffset;
-      return;
-    }
-
-    if (currentHourOffset === previousHourRef.current) return;
-
-    if (isPlaying) {
-      previousHourRef.current = currentHourOffset;
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      previousHourRef.current = currentHourOffset;
-      updateBriefingForHour(currentHourOffset);
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [currentHourOffset, isPlaying, station, updateBriefingForHour]);
-
-  const wasPlayingRef = useRef(isPlaying);
-  useEffect(() => {
-    const wasPrevPlaying = wasPlayingRef.current;
-    wasPlayingRef.current = isPlaying;
-
-    if (wasPrevPlaying && !isPlaying && station && station.status !== "fetching-metar") {
-      updateBriefingForHour(currentHourOffset);
-    }
-  }, [isPlaying, currentHourOffset, station, updateBriefingForHour]);
 
   const airportsByRegion = useMemo(() => {
     const grouped: Record<string, typeof BRAZILIAN_AIRPORTS> = {};
@@ -183,25 +148,79 @@ export default function AISidebar() {
   const distKmFormatted = routeDistanceKm ? `${Math.round(routeDistanceKm).toLocaleString("pt-BR")} km` : null;
   const distNmFormatted = routeDistanceKm ? `${Math.round(routeDistanceKm / 1.852).toLocaleString("pt-BR")} NM` : null;
 
-  const [forecastExtras, setForecastExtras] = useState<{ temperature: number; pressure: number } | null>(null);
+  type HourForecast = {
+    temperature: number;
+    pressure: number;
+    wind_degrees: number | null;
+    wind_kts: number | null;
+    wind_gust_kts: number | null;
+    visibility_m: number | null;
+  };
+
+  const [forecastMap, setForecastMap] = useState<Record<number, HourForecast> | null>(null);
+  const [forecastMapLoading, setForecastMapLoading] = useState(false);
   useEffect(() => {
-    if (currentHourOffset === 0 || !station) { setForecastExtras(null); return; }
+    if (!station) { setForecastMap(null); return; }
     const { lat, lon } = station.airport;
     const controller = new AbortController();
-    fetch(`/api/forecast?lat=${lat}&lon=${lon}&hourOffset=${currentHourOffset}`, { signal: controller.signal })
+    setForecastMap(null);
+    setForecastMapLoading(true);
+    const omUrl =
+      `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${lat}&longitude=${lon}` +
+      `&hourly=temperature_2m,pressure_msl,windspeed_10m,winddirection_10m,windgusts_10m,visibility` +
+      `&timezone=UTC&forecast_days=3`;
+    fetch(omUrl, { signal: controller.signal })
       .then((r) => r.json())
-      .then((d) => { if (!d.error) setForecastExtras(d); })
-      .catch(() => { });
-    return () => controller.abort();
-  }, [currentHourOffset, station?.airport.icao]);
+      .then((json) => {
+        const times: string[] = json.hourly?.time ?? [];
+        const temps: number[] = json.hourly?.temperature_2m ?? [];
+        const pressures: number[] = json.hourly?.pressure_msl ?? [];
+        const windspeed: number[] = json.hourly?.windspeed_10m ?? [];
+        const winddir: number[] = json.hourly?.winddirection_10m ?? [];
+        const windgusts: number[] = json.hourly?.windgusts_10m ?? [];
+        const visibility: number[] = json.hourly?.visibility ?? [];
+
+        const now = new Date();
+        now.setMinutes(0, 0, 0);
+        const baseStr = now.toISOString().slice(0, 16);
+        const baseIdx = times.findIndex((t) => t === baseStr);
+        if (baseIdx === -1) return;
+
+        const result: Record<number, HourForecast> = {};
+        for (let offset = 0; offset <= 24; offset++) {
+          const idx = baseIdx + offset;
+          if (idx >= times.length) break;
+          result[offset] = {
+            temperature: Math.round(temps[idx] * 10) / 10,
+            pressure: Math.round(pressures[idx]),
+            wind_degrees: winddir[idx] != null ? Math.round(winddir[idx]) : null,
+            wind_kts: windspeed[idx] != null ? Math.round(windspeed[idx] / 1.852) : null,
+            wind_gust_kts: windgusts[idx] != null ? Math.round(windgusts[idx] / 1.852) : null,
+            visibility_m: visibility[idx] != null ? Math.round(visibility[idx]) : null,
+          };
+        }
+        setForecastMap(result);
+      })
+      .catch(() => { })
+      .finally(() => setForecastMapLoading(false));
+    return () => { controller.abort(); setForecastMapLoading(false); };
+  }, [station?.airport.icao]);
+
+  const forecastExtras = currentHourOffset > 0 ? (forecastMap?.[currentHourOffset] ?? null) : null;
 
   const tafExpiryStatus = useMemo(() => {
     if (currentHourOffset === 0 || !station?.taf) return null;
 
     const taf = station.taf;
-    const rawValidTo =
-      taf.valid_to ??
-      [...(taf.forecast ?? [])].reverse().find((b) => b.change?.period?.to)?.change?.period?.to;
+    const rawValidTo = taf.valid_to ?? (() => {
+      let max: string | undefined;
+      for (const b of taf.forecast ?? []) {
+        const t = b.change?.period?.to;
+        if (t && (!max || t > max)) max = t;
+      }
+      return max;
+    })();
 
     if (!rawValidTo) return null;
 
@@ -214,9 +233,72 @@ export default function AISidebar() {
     return null;
   }, [currentHourOffset, station?.taf]);
 
+  const tafSnapshot = useMemo(
+    () => currentHourOffset > 0 && station?.taf ? parseTafAtHour(station.taf, currentHourOffset) : null,
+    [currentHourOffset, station?.taf]
+  );
+
+  const isForecastLoading = currentHourOffset > 0 && forecastMapLoading && !tafSnapshot;
+
+  const activeFlightCategory = useMemo(() => {
+    const metar = station?.metar;
+    if (!metar || currentHourOffset === 0) return metar?.flight_category;
+    let vis = metar.visibility?.meters;
+    let sky = metar.sky_conditions;
+    if (tafSnapshot) {
+      if (tafSnapshot.visibility) vis = tafSnapshot.visibility.meters;
+      if (tafSnapshot.sky_conditions) sky = tafSnapshot.sky_conditions;
+    } else if (forecastExtras?.visibility_m != null) {
+      vis = forecastExtras.visibility_m;
+    }
+    const ceilFt = sky
+      ?.filter((c) => c.sky_cover === "BKN" || c.sky_cover === "OVC")
+      .map((c) => c.base_feet_agl)
+      .sort((a, b) => a - b)[0];
+    if (vis === undefined && ceilFt === undefined) return metar.flight_category;
+    const v = vis ?? Infinity;
+    const c = ceilFt ?? Infinity;
+    if (v < 1600 || c < 500) return "LIFR" as const;
+    if (v < 5000 || c < 1000) return "IFR" as const;
+    if (v < 8000 || c < 3000) return "MVFR" as const;
+    return "VFR" as const;
+  }, [station?.metar, currentHourOffset, tafSnapshot, forecastExtras]);
+
+  useEffect(() => {
+    setProjectedFlightCategory(activeFlightCategory);
+  }, [activeFlightCategory, setProjectedFlightCategory]);
+  const activeMetar = useMemo<MetarData | null>(() => {
+    const metar = station?.metar;
+    if (currentHourOffset === 0 || !metar) return metar ?? null;
+    if (tafSnapshot) {
+      return {
+        ...metar,
+        ...(tafSnapshot.wind && { wind: tafSnapshot.wind }),
+        ...(tafSnapshot.visibility && { visibility: tafSnapshot.visibility }),
+        ...(tafSnapshot.sky_conditions && {
+          sky_conditions: tafSnapshot.sky_conditions,
+          ceiling: undefined,
+        }),
+      } as MetarData;
+    }
+    const extras: Record<string, unknown> = {};
+    if (forecastExtras?.wind_kts != null) {
+      extras.wind = {
+        degrees: forecastExtras.wind_degrees ?? undefined,
+        speed_kts: forecastExtras.wind_kts,
+        gust_kts: forecastExtras.wind_gust_kts ?? undefined,
+      };
+    }
+    if (forecastExtras?.visibility_m != null) {
+      extras.visibility = { meters: forecastExtras.visibility_m };
+    }
+    return { ...metar, ...extras } as MetarData;
+  }, [currentHourOffset, station?.metar, tafSnapshot, forecastExtras]);
+
   // =============================================================================
-  // Welcome screen (no airport selected)
+  // Tela de Boas-Vindas
   // =============================================================================
+
   if (!isSidebarOpen || !station) {
     return (
       <div className="flex h-full flex-col p-4 gap-4 overflow-y-auto">
@@ -260,12 +342,12 @@ export default function AISidebar() {
         </div>
 
         <div className="flex flex-col gap-4">
-          <p className="text-[9px] font-bold tracking-widest text-slate-600 uppercase text-center shrink-0">
+          <p className="text-xs font-bold tracking-widest text-slate-500 uppercase text-center shrink-0">
             {searchQuery.trim() ? "Resultados da Busca" : "Acesso Rápido — Todos os Aeroportos"}
           </p>
 
           {Object.keys(airportsByRegion).length === 0 && (
-            <div className="text-center text-xs text-slate-500 py-4">
+            <div className="text-center text-sm text-slate-500 py-4">
               Nenhum aeroporto encontrado.
             </div>
           )}
@@ -275,29 +357,29 @@ export default function AISidebar() {
             if (!airports?.length) return null;
             return (
               <div key={region}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 tracking-wide">{region}</span>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-bold text-slate-300 tracking-wide">{region}</span>
                   <div className="flex-1 h-[1px] bg-slate-800" />
-                  <span className="text-[9px] text-slate-600">{airports.length}</span>
+                  <span className="text-xs text-slate-500">{airports.length}</span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-3 gap-1.5">
                   {airports.map((ap) => {
                     const isFav = favoriteIcaos.includes(ap.icao);
                     return (
                       <button
                         key={ap.icao}
                         onClick={() => selectAirport(ap)}
-                        className={`group flex flex-col items-start px-2 py-1.5 rounded-lg border transition-all duration-150 text-left relative ${isFav
-                            ? "bg-amber-950/30 border-amber-500/25 hover:bg-amber-900/40 hover:border-amber-500/50"
-                            : "bg-slate-900/50 border-slate-800/80 hover:bg-slate-800/70 hover:border-indigo-500/40"
+                        className={`group flex flex-col items-start px-2.5 py-2 rounded-lg border transition-all duration-150 text-left relative ${isFav
+                          ? "bg-amber-950/30 border-amber-500/25 hover:bg-amber-900/40 hover:border-amber-500/50"
+                          : "bg-slate-900/50 border-slate-800/80 hover:bg-slate-800/70 hover:border-indigo-500/40"
                           }`}
                       >
-                        {isFav && <Star className="absolute top-1 right-1 w-1.5 h-1.5 text-amber-400 fill-amber-400" />}
-                        <span className={`font-mono text-[9px] font-extrabold tracking-widest leading-none ${isFav ? "text-amber-400" : "text-indigo-400 group-hover:text-indigo-300"}`}>
+                        {isFav && <Star className="absolute top-1.5 right-1.5 w-2 h-2 text-amber-400 fill-amber-400" />}
+                        <span className={`font-mono text-xs font-extrabold tracking-widest leading-none ${isFav ? "text-amber-400" : "text-indigo-400 group-hover:text-indigo-300"}`}>
                           {ap.icao}
                         </span>
-                        <span className="text-[7px] text-slate-500 leading-tight mt-0.5 truncate w-full group-hover:text-slate-400">
+                        <span className="text-[10px] text-slate-500 leading-tight mt-1 truncate w-full group-hover:text-slate-400">
                           {ap.city}
                         </span>
                       </button>
@@ -313,7 +395,7 @@ export default function AISidebar() {
   }
 
   // =============================================================================
-  // Limiting factor — explains WHY the category is IFR/LIFR
+  // Fator Limitante
   // =============================================================================
 
   function getLimitingFactor(m: MetarData | undefined, cat: string | undefined) {
@@ -354,7 +436,7 @@ export default function AISidebar() {
   }
 
   // =============================================================================
-  // Visual helpers
+  // Auxiliares Visuais
   // =============================================================================
 
   function skyLabel(cover: string) {
@@ -381,25 +463,12 @@ export default function AISidebar() {
     return "#ef4444";
   }
 
-  function visPct(meters: number) {
-    return Math.min((meters / 9999) * 100, 100);
-  }
-
-  function fmtTime(iso?: string) {
-    if (!iso) return "--:--";
-    try {
-      const d = new Date(iso);
-      return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}Z`;
-    } catch { return "--:--"; }
-  }
-
   // =============================================================================
-  // Airport selected view
+  // Visão do Aeroporto Selecionado
   // =============================================================================
+
   const isStationFav = favoriteIcaos.includes(station.airport.icao);
   const metar = station.metar;
-  const activeMetar = currentHourOffset === 0 ? metar : (station.briefing?.forecast ? { ...metar, ...station.briefing.forecast } : metar);
-
 
   return (
     <AnimatePresence mode="wait">
@@ -417,18 +486,14 @@ export default function AISidebar() {
                 onClick={() => toggleFavorite(station.airport.icao)}
                 title={isStationFav ? "Remover dos favoritos" : "Adicionar aos favoritos"}
                 className={`p-1.5 rounded-lg border transition-all duration-200 ${isStationFav
-                    ? "bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30"
-                    : "bg-slate-900/60 border-slate-700 text-slate-500 hover:text-amber-400 hover:border-amber-500/40"
+                  ? "bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30"
+                  : "bg-slate-900/60 border-slate-700 text-slate-500 hover:text-amber-400 hover:border-amber-500/40"
                   }`}
               >
                 <Star className={`w-3.5 h-3.5 ${isStationFav ? "fill-amber-400" : ""}`} />
               </button>
 
-              <Badge category={
-                currentHourOffset === 0
-                  ? station.metar?.flight_category
-                  : (station.briefing?.flightCategory || station.metar?.flight_category)
-              } />
+              <Badge category={activeFlightCategory} />
 
               <button
                 onClick={clearStation}
@@ -568,21 +633,31 @@ export default function AISidebar() {
         {tafExpiryStatus && (
           <motion.div
             variants={itemVariants}
-            className={`mb-3 rounded-xl border px-3 py-2.5 flex items-start gap-2 ${tafExpiryStatus === "expired"
-                ? "border-rose-500/30 bg-rose-500/10"
-                : "border-amber-500/30 bg-amber-500/10"
+            className={`mb-3 rounded-xl border px-4 py-3 flex items-start gap-3 ${tafExpiryStatus === "expired"
+              ? "border-rose-500/30 bg-rose-500/10"
+              : "border-amber-500/30 bg-amber-500/10"
               }`}
           >
-            <AlertTriangle className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${tafExpiryStatus === "expired" ? "text-rose-400" : "text-amber-400"}`} />
+            <AlertTriangle className={`w-4.5 h-4.5 mt-0.5 flex-shrink-0 ${tafExpiryStatus === "expired" ? "text-rose-400" : "text-amber-400"}`} />
             <div>
-              <p className={`text-[9px] font-bold tracking-widest uppercase mb-0.5 ${tafExpiryStatus === "expired" ? "text-rose-400" : "text-amber-400"}`}>
+              <p className={`text-xs font-bold tracking-widest uppercase mb-1 ${tafExpiryStatus === "expired" ? "text-rose-400" : "text-amber-400"}`}>
                 {tafExpiryStatus === "expired" ? "TAF Expirado para este Horário" : "TAF Próximo do Limite de Validade"}
               </p>
-              <p className="text-[10px] text-slate-400 leading-relaxed">
+              <p className="text-xs text-slate-400 leading-relaxed">
                 {tafExpiryStatus === "expired"
-                  ? `O TAF não cobre +${currentHourOffset}H. Os dados exibidos são extrapolações além da validade — interprete com cautela.`
+                  ? `O TAF não cobre +${currentHourOffset}H. Os dados meteorológicos exibidos refletem a observação atual (METAR) — não há previsão disponível para este horário.`
                   : "O horário selecionado está próximo do fim do TAF. A previsão pode ser menos confiável."}
               </p>
+            </div>
+          </motion.div>
+        )}
+
+        {isForecastLoading && (
+          <motion.div variants={itemVariants} className="mb-3 rounded-xl border border-indigo-500/20 bg-indigo-500/8 px-4 py-3 flex items-center gap-3">
+            <Loader2 className="w-4 h-4 text-indigo-400 animate-spin flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-indigo-300">Carregando previsão para +{currentHourOffset}H</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Buscando dados do Open-Meteo… Os valores abaixo ainda refletem o METAR atual.</p>
             </div>
           </motion.div>
         )}
@@ -619,6 +694,9 @@ export default function AISidebar() {
                 <div className="flex items-center gap-1.5 mb-1">
                   <Wind className="w-3.5 h-3.5 text-sky-400" />
                   <span className="text-[9px] font-bold tracking-widest text-slate-400 uppercase">Vento</span>
+                  {currentHourOffset > 0 && !station.briefing?.forecast && forecastExtras?.wind_kts != null && (
+                    <span className="ml-auto text-[8px] text-sky-600 font-mono">Open-Meteo</span>
+                  )}
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
@@ -638,6 +716,9 @@ export default function AISidebar() {
                 <div className="flex items-center gap-1.5 mb-1">
                   <Eye className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="text-[9px] font-bold tracking-widest text-slate-400 uppercase">Visibilidade</span>
+                  {currentHourOffset > 0 && !station.briefing?.forecast && forecastExtras?.visibility_m != null && (
+                    <span className="ml-auto text-[8px] text-sky-600 font-mono">Open-Meteo</span>
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <span className="text-3xl font-black font-mono tabular-nums leading-none tracking-tighter" style={{ color: visColor(activeMetar.visibility.meters) }}>
@@ -695,12 +776,8 @@ export default function AISidebar() {
           </div>
         )}
 
-        {/* Limiting factor banner */}
         {activeMetar && (() => {
-          const activeCat = currentHourOffset === 0
-            ? activeMetar?.flight_category
-            : (station.briefing?.flightCategory || activeMetar?.flight_category);
-          const factors = getLimitingFactor(activeMetar as MetarData, activeCat);
+          const factors = getLimitingFactor(activeMetar as MetarData, activeFlightCategory);
           if (!factors) return null;
           return (
             <motion.div
@@ -736,19 +813,55 @@ export default function AISidebar() {
         {station.briefing && station.status === "done" && (
 
           <div className="flex flex-col gap-4">
+
+            {station.briefing.isMock && (
+              <motion.div variants={itemVariants}
+                className="rounded-xl border border-amber-500/30 bg-amber-500/8 p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center mt-0.5">
+                    <BotOff className="w-4.5 h-4.5 text-amber-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-amber-300 mb-1">Análise de IA indisponível</p>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      O serviço de inteligência artificial está temporariamente fora do ar. Os alertas abaixo foram gerados automaticamente a partir dos blocos do TAF — pode haver menos detalhes do que o normal.
+                    </p>
+                    <button
+                      onClick={() => selectAirport(station.airport)}
+                      className="mt-2.5 flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Tentar novamente
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             <motion.div variants={itemVariants}>
-              <AlertList alerts={station.briefing.alerts} />
+              <AlertList alerts={station.briefing.alerts.filter((a) => {
+                if (a.title === "Previsão AI Indisponível") return false;
+                const projectedTime = Date.now() + currentHourOffset * 3_600_000;
+                const from = a.validFrom ? new Date(a.validFrom).getTime() : -Infinity;
+                const to = a.validTo ? new Date(a.validTo).getTime() : Infinity;
+                return from <= projectedTime && projectedTime < to;
+              })} />
             </motion.div>
 
-            <motion.div variants={itemVariants} className="rounded-xl border border-white/5 bg-slate-900/90 p-4 shadow-xl">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Resumo da IA</h3>
-              <p className="selectable-text text-sm leading-relaxed text-slate-200">{station.briefing.summary}</p>
-            </motion.div>
+            {!station.briefing.isMock && station.briefing.summary && (
+              <motion.div variants={itemVariants} className="rounded-xl border border-white/5 bg-slate-900/90 p-4 shadow-xl">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Resumo da IA</h3>
+                <p className="selectable-text text-sm leading-relaxed text-slate-200">{station.briefing.summary}</p>
+              </motion.div>
+            )}
 
-            <motion.div variants={itemVariants} className="rounded-xl border border-white/5 bg-slate-900/90 p-4 shadow-xl">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Condições Atuais</h3>
-              <p className="selectable-text text-sm leading-relaxed text-slate-200">{station.briefing.conditions}</p>
-            </motion.div>
+            {!station.briefing.isMock && station.briefing.conditions && (
+              <motion.div variants={itemVariants} className="rounded-xl border border-white/5 bg-slate-900/90 p-4 shadow-xl">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Condições Atuais</h3>
+                <p className="selectable-text text-sm leading-relaxed text-slate-200">{station.briefing.conditions}</p>
+              </motion.div>
+            )}
 
           </div>
         )}

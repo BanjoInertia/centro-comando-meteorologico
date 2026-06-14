@@ -47,7 +47,6 @@ export default function RouteArc({ origin, destination }: Props) {
 
   return (
     <group>
-      {/* Glow exterior */}
       <Line
         points={arcPoints}
         color="#a78bfa"
@@ -57,7 +56,6 @@ export default function RouteArc({ origin, destination }: Props) {
         dashed={false}
       />
 
-      {/* Linha principal */}
       <Line
         points={arcPoints}
         color="#e0e7ff"
@@ -67,7 +65,6 @@ export default function RouteArc({ origin, destination }: Props) {
         dashed={false}
       />
 
-      {/* Linha de cor secundária */}
       <Line
         points={arcPoints}
         color="#818cf8"
@@ -77,13 +74,11 @@ export default function RouteArc({ origin, destination }: Props) {
         dashed={false}
       />
 
-      {/* Partícula animada */}
       <mesh ref={particleRef}>
         <sphereGeometry args={[0.009, 8, 8]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={1} />
       </mesh>
 
-      {/* Halo da partícula */}
       <mesh ref={glowRef}>
         <sphereGeometry args={[0.018, 8, 8]} />
         <meshBasicMaterial color="#818cf8" transparent opacity={0.35} />

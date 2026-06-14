@@ -18,7 +18,7 @@ import { useWindData } from "@/hooks/useWindData";
 
 export default function GlobeScene() {
   const focusedAirport    = useAppStore((s) => s.focusedAirport);
-  const selectedStation   = useAppStore((s) => s.selectedStation);
+
   const currentHourOffset = useAppStore((s) => s.timeline.currentHourOffset);
   const routeOrigin       = useAppStore((s) => s.routeOrigin);
   const routeDestination  = useAppStore((s) => s.routeDestination);
@@ -34,18 +34,13 @@ export default function GlobeScene() {
     return latLonToVector3(0, -15 * (simulatedUtcHours - 12), 15);
   }, [currentHourOffset]);
 
+  const projectedFlightCategory = useAppStore((s) => s.projectedFlightCategory);
+
   const scanningColor = useMemo(() => {
     if (!focusedAirport) return undefined;
-    let cat = flightCategories[focusedAirport.icao];
-    if (selectedStation?.airport.icao === focusedAirport.icao) {
-      if (currentHourOffset === 0) {
-        cat = selectedStation.metar?.flight_category || cat;
-      } else {
-        cat = selectedStation.briefing?.flightCategory || selectedStation.metar?.flight_category || cat;
-      }
-    }
+    const cat = projectedFlightCategory ?? flightCategories[focusedAirport.icao];
     return flightCategoryToColor(cat as any);
-  }, [focusedAirport, flightCategories, selectedStation, currentHourOffset]);
+  }, [focusedAirport, projectedFlightCategory, flightCategories]);
 
   return (
     <Canvas

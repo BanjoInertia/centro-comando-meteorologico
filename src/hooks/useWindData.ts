@@ -20,8 +20,8 @@ export function useWindData() {
         if (json.data) {
           setWindLayer(json.data);
         }
-      } catch (err) {
-        console.warn("[useWindData] Falha ao buscar dados de vento:", err.message || err);
+      } catch (err: any) {
+        console.warn("[useWindData] Falha ao buscar dados de vento:", err?.message || err);
       }
     }
 

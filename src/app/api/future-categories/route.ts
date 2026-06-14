@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: categories });
 
   } catch (err: any) {
-    console.error("[future-categories] Erro:", err.message);
-    return NextResponse.json({ error: "Failed to fetch future categories" }, { status: 500 });
+    console.warn("[future-categories] CheckWX falhou, usando fallback vazio:", err.message);
+    return NextResponse.json({ data: {} });
   }
 }

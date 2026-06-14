@@ -1,4 +1,3 @@
-import React from "react";
 import { Info, AlertTriangle, OctagonAlert } from "lucide-react";
 import { WeatherAlert } from "@/types";
 import { motion, Variants } from "framer-motion";
@@ -14,6 +13,18 @@ const cardVariants: Variants = {
 
 interface AlertCardProps {
   alert: WeatherAlert;
+}
+
+const MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+function formatAlertTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const mon = MONTHS[d.getUTCMonth()];
+  const hh  = String(d.getUTCHours()).padStart(2, "0");
+  const mm  = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${day} ${mon} · ${hh}:${mm}Z`;
 }
 
 export default function AlertCard({ alert }: AlertCardProps) {
@@ -60,9 +71,20 @@ export default function AlertCard({ alert }: AlertCardProps) {
           </p>
           
           {(alert.validFrom || alert.validTo) && (
-            <div className="mt-3 flex items-center gap-2 text-[10px] text-slate-400 font-mono">
-              {alert.validFrom && <span>De: {alert.validFrom}</span>}
-              {alert.validTo && <span>Até: {alert.validTo}</span>}
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              {alert.validFrom && (
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">De</span>
+                  <span className="text-xs font-mono font-semibold text-slate-300">{formatAlertTime(alert.validFrom)}</span>
+                </div>
+              )}
+              {alert.validFrom && alert.validTo && <span className="text-slate-700 text-sm">→</span>}
+              {alert.validTo && (
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">Até</span>
+                  <span className="text-xs font-mono font-semibold text-slate-300">{formatAlertTime(alert.validTo)}</span>
+                </div>
+              )}
             </div>
           )}
         </div>

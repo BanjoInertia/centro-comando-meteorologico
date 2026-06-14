@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { SelectedStation, TimelineState, Airport, WindLayer } from "@/types";
 
 // =============================================================================
-// Helpers
+// Utilitários
 // =============================================================================
 
 function haversineKm(a: Airport, b: Airport): number {
@@ -17,7 +17,7 @@ function haversineKm(a: Airport, b: Airport): number {
 }
 
 // =============================================================================
-// State interface
+// Interface de Estado
 // =============================================================================
 
 interface AppState {
@@ -61,12 +61,20 @@ interface AppState {
   toggleWindLayer: () => void;
 
   flightCategories: Record<string, string>;
+  trustedIcaos: string[];
   setFlightCategories: (cats: Record<string, string>) => void;
+  setTrustedFlightCategory: (icao: string, cat: string) => void;
   replaceFlightCategories: (cats: Record<string, string>) => void;
+
+  projectedFlightCategory: string | undefined;
+  setProjectedFlightCategory: (cat: string | undefined) => void;
+
+  metarSyncTotal: number;
+  setMetarSyncTotal: (n: number) => void;
 }
 
 // =============================================================================
-// Store
+// Store Global
 // =============================================================================
 
 export const useAppStore = create<AppState>()(
@@ -152,14 +160,33 @@ export const useAppStore = create<AppState>()(
       toggleWindLayer: () => set((state) => ({ showWindLayer: !state.showWindLayer })),
 
       flightCategories: {},
+      trustedIcaos: [],
       setFlightCategories: (cats) =>
         set((state) => ({ flightCategories: { ...state.flightCategories, ...cats } })),
+      setTrustedFlightCategory: (icao, cat) =>
+        set((state) => ({
+          flightCategories: { ...state.flightCategories, [icao]: cat },
+          trustedIcaos: state.trustedIcaos.includes(icao)
+            ? state.trustedIcaos
+            : [...state.trustedIcaos, icao],
+        })),
       replaceFlightCategories: (cats) =>
         set({ flightCategories: cats }),
+
+      projectedFlightCategory: undefined,
+      setProjectedFlightCategory: (cat) => set({ projectedFlightCategory: cat }),
+
+      metarSyncTotal: 0,
+      setMetarSyncTotal: (n) => set({ metarSyncTotal: n }),
     }),
     {
       name: "aero-weather-store",
-      partialize: (state) => ({ favoriteIcaos: state.favoriteIcaos }),
+      version: 3,
+      migrate: (old: any) => ({
+        favoriteIcaos: old?.favoriteIcaos ?? [],
+        flightCategories: old?.flightCategories ?? {},
+      }),
+      partialize: (state) => ({ favoriteIcaos: state.favoriteIcaos, flightCategories: state.flightCategories }),
     }
   )
 );

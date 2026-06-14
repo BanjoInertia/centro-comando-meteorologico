@@ -1,5 +1,5 @@
 // =============================================================================
-// THREE.JS UTILITIES - Conversão de coordenadas geográficas para 3D
+// THREE.JS UTILITIES
 // =============================================================================
 
 import * as THREE from "three";

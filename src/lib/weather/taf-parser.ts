@@ -1,7 +1,7 @@
 import { TafData } from "@/types";
 
 export interface TafSnapshot {
-  wind?: { degrees: number; speed_kts: number; gust_kts?: number };
+  wind?: { degrees?: number; speed_kts: number; gust_kts?: number };
   visibility?: { meters: number };
   sky_conditions?: Array<{ sky_cover: string; base_feet_agl: number }>;
   ceiling_ft?: number;
@@ -11,7 +11,7 @@ export interface TafSnapshot {
 type BlockState = {
   visMeters?: number;
   ceilFeet?: number;
-  wind?: { degrees: number; speed_kts: number; gust_kts?: number };
+  wind?: { degrees?: number; speed_kts: number; gust_kts?: number };
   sky?: Array<{ sky_cover: string; base_feet_agl: number }>;
 };
 
@@ -37,10 +37,22 @@ function applyBlock(
   }
 }
 
-export function parseTafAtHour(taf: TafData, hourOffset: number): TafSnapshot {
-  if (!taf.forecast?.length) return { hasTempo: false };
+export function parseTafAtHour(taf: TafData, hourOffset: number): TafSnapshot | null {
+  if (!taf.forecast?.length) return null;
 
   const targetTime = new Date(Date.now() + hourOffset * 3600 * 1000);
+
+  const rawValidTo = taf.valid_to ?? (() => {
+    let max: string | undefined;
+    for (const b of taf.forecast!) {
+      const t = b.change?.period?.to;
+      if (t && (!max || t > max)) max = t;
+    }
+    return max;
+  })();
+
+  if (rawValidTo && new Date(rawValidTo) < targetTime) return null;
+
   const state: BlockState = {};
 
   for (const block of taf.forecast) {

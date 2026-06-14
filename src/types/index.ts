@@ -1,8 +1,6 @@
 // =============================================================================
-// TIPOS GLOBAIS - Centro de Comando Meteorológico
+// TIPOS GLOBAIS
 // =============================================================================
-
-// --- Aeroportos e Estações ---
 
 export interface Airport {
   icao: string;
@@ -16,14 +14,12 @@ export interface Airport {
   timezoneOffset: number;
 }
 
-// --- Dados Meteorológicos Brutos ---
-
 export interface MetarData {
   raw_text: string;
   station: string;
   observed: string;
   wind?: {
-    degrees: number;
+    degrees?: number;
     speed_kts: number;
     gust_kts?: number;
   };
@@ -73,13 +69,12 @@ export interface TafData {
       meters: number;
     };
     wind?: {
-      degrees: number;
+      degrees?: number;
       speed_kts: number;
+      gust_kts?: number;
     };
   }>;
 }
-
-// --- Briefing da IA ---
 
 export type AlertLevel = "info" | "attention" | "danger";
 
@@ -102,8 +97,6 @@ export interface AiBriefing {
   forecast?: Partial<MetarData>;
 }
 
-// --- Estado Global (Zustand) ---
-
 export type LoadingStatus =
   | "idle"
   | "fetching-metar"
@@ -125,8 +118,6 @@ export interface TimelineState {
   isPlaying: boolean;
 }
 
-// --- Dados de Vento Global ---
-
 export interface WindPoint {
   lat: number;
   lon: number;
@@ -139,8 +130,6 @@ export interface WindLayer {
   points: WindPoint[];
   fetchedAt: string;
 }
-
-// --- API Responses ---
 
 export interface ApiResponse<T> {
   data: T | null;

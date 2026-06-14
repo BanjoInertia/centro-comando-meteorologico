@@ -16,7 +16,6 @@ export default function ThermalLegend() {
           </span>
         </div>
 
-        {/* Barra de Gradiente */}
         <div
           className="w-full h-2.5 rounded-full shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)] border border-slate-800/50"
           style={{
@@ -24,7 +23,6 @@ export default function ThermalLegend() {
           }}
         />
 
-        {/* Marcadores de Temperatura */}
         <div className="flex justify-between items-center text-[10px] font-mono font-bold text-slate-300">
           <span className="text-[#1f0040] brightness-150">-30°C</span>
           <span className="text-[#004cd9] brightness-125">-12°C</span>

@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateWeatherBriefing } from "@/lib/gemini/client";
-import { MetarData, TafData, WeatherAlert } from "@/types";
-import { parseTafAtHour } from "@/lib/weather/taf-parser";
+import { MetarData, TafData, WeatherAlert, AlertLevel } from "@/types";
 
 export async function POST(req: NextRequest) {
-  let hourOffset = 0;
   let metar: MetarData | null = null;
   let taf: TafData | null = null;
   try {
     const body = await req.json();
-    const { airport, metar: parsedMetar, taf: parsedTaf, hourOffset: parsedHourOffset = 0 } = body as {
+    const { airport, metar: parsedMetar, taf: parsedTaf } = body as {
       airport: { name: string };
       metar: MetarData | null;
       taf: TafData | null;
-      hourOffset?: number;
     };
-    hourOffset = parsedHourOffset;
     metar = parsedMetar;
     taf = parsedTaf;
 
@@ -26,7 +22,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const data = await generateWeatherBriefing(airport.name, metar, taf, hourOffset);
+    const data = await generateWeatherBriefing(airport.name, metar, taf);
 
     return NextResponse.json({
       data,
@@ -35,51 +31,73 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     try {
-      console.warn("Retornando Mock Data devido a falha na API do Gemini/Groq:", err?.message || String(err));
-      
-      let flightCategory = metar?.flight_category || "VFR";
-      let summary = `Briefing indisponível (A IA excedeu o limite de uso). Exibindo condições atuais do METAR.`;
-      let conditions = metar?.raw_text ? `METAR: ${metar.raw_text}` : "Condições atuais indisponíveis.";
-      let alerts: WeatherAlert[] = [
-        {
-          level: "info",
-          title: "Previsão AI Indisponível",
-          description: "A inteligência artificial atingiu o limite de consultas gratuitas. As condições mostradas refletem a observação atual (METAR).",
+      console.warn("Retornando fallback determinístico:", err?.message || String(err));
+
+      const vis = metar?.visibility?.meters;
+      const ceilFt = (metar as any)?.ceiling?.feet ??
+        metar?.sky_conditions
+          ?.filter((c) => c.sky_cover === "BKN" || c.sky_cover === "OVC")
+          .sort((a, b) => a.base_feet_agl - b.base_feet_agl)[0]?.base_feet_agl;
+
+      const flightCategory: "VFR" | "MVFR" | "IFR" | "LIFR" =
+        (vis !== undefined && vis < 1600) || (ceilFt !== undefined && ceilFt < 500) ? "LIFR" :
+          (vis !== undefined && vis < 5000) || (ceilFt !== undefined && ceilFt < 1000) ? "IFR" :
+            (vis !== undefined && vis < 8000) || (ceilFt !== undefined && ceilFt < 3000) ? "MVFR" : "VFR";
+
+      const alerts: WeatherAlert[] = [{
+        level: "info",
+        title: "Previsão AI Indisponível",
+        description: "A IA está temporariamente indisponível. Os alertas abaixo foram gerados diretamente a partir dos blocos do TAF.",
+      }];
+
+      if (taf?.forecast?.length) {
+        for (const block of taf.forecast) {
+          const type = block.change?.type ?? "INITIAL";
+          if (type === "INITIAL") continue;
+          if (type === "PROB30" || type === "PROB40") continue;
+
+          const from = block.change?.period?.from;
+          const to = block.change?.period?.to;
+
+          const parts: string[] = [];
+          if (block.wind) {
+            const deg = block.wind.degrees != null ? `${block.wind.degrees}°` : "VRB";
+            const gust = block.wind.gust_kts ? ` rajadas ${block.wind.gust_kts}kt` : "";
+            parts.push(`Vento ${deg}/${block.wind.speed_kts}kt${gust}`);
+          }
+          if (block.visibility?.meters !== undefined) parts.push(`Vis. ${block.visibility.meters}m`);
+          if (block.clouds?.length) {
+            parts.push(block.clouds.map((c) => `${c.code} ${c.feet}ft`).join(" · "));
+          }
+          if (parts.length === 0) continue;
+
+          const bv = block.visibility?.meters ?? Infinity;
+          const bceil = block.clouds?.filter((c) => c.code === "BKN" || c.code === "OVC").sort((a, b) => a.feet - b.feet)[0]?.feet ?? Infinity;
+          const level: AlertLevel =
+            bv < 1600 || bceil < 500 ? "danger" :
+              bv < 5000 || bceil < 1000 ? "attention" :
+                bv < 8000 || bceil < 3000 ? "attention" : "info";
+
+          const typeLabel: Record<string, string> = { TEMPO: "TEMPO", BECMG: "BECMG", FM: "Mudança" };
+          alerts.push({
+            level,
+            title: `${typeLabel[type] ?? "Previsão"}: ${parts[0]}`,
+            description: parts.join(" · "),
+            validFrom: from,
+            validTo: to,
+          });
         }
-      ];
-
-      let forecast: any = metar ? { ...metar } : {};
-
-      if (hourOffset > 0 && taf) {
-        summary = `Briefing indisponível (A IA excedeu o limite de uso). Exibindo previsão estruturada do TAF para +${hourOffset}H.`;
-        conditions = taf.raw_text ? `TAF base: ${taf.raw_text}` : "Condições previstas baseadas no TAF.";
-        alerts[0].description = `A inteligência artificial está indisponível. As condições e a categoria de voo (cor do aeroporto) refletem a extração determinística do TAF para o horário selecionado (+${hourOffset}H).`;
-
-        const snap = parseTafAtHour(taf, hourOffset);
-
-        if (snap.wind)       forecast.wind       = snap.wind;
-        if (snap.visibility) forecast.visibility = snap.visibility;
-        if (snap.sky_conditions) {
-          forecast.sky_conditions = snap.sky_conditions;
-        }
-
-        const v = snap.visibility?.meters ?? Infinity;
-        const c = snap.ceiling_ft ?? Infinity;
-        if      (v < 1600 || c < 500)  flightCategory = "LIFR";
-        else if (v < 5000 || c < 1000) flightCategory = "IFR";
-        else if (v < 8000 || c < 3000) flightCategory = "MVFR";
-        else                            flightCategory = "VFR";
       }
 
       return NextResponse.json({
         data: {
-          summary,
-          conditions,
+          summary: metar?.raw_text ? `Previsão AI indisponível. METAR: ${metar.raw_text}` : "Previsão AI indisponível.",
+          conditions: metar?.raw_text ?? "Condições atuais indisponíveis.",
           alerts,
           flightCategory,
           updatedAt: new Date().toISOString(),
           isMock: true,
-          forecast,
+          forecast: metar ?? undefined,
         },
         error: null,
         timestamp: new Date().toISOString(),
@@ -87,7 +105,7 @@ export async function POST(req: NextRequest) {
     } catch (mockErr: any) {
       return NextResponse.json({
         data: null,
-        error: `Falha dupla: a IA falhou (${err?.message}) e o fallback falhou (${mockErr?.message})`,
+        error: `Falha dupla: IA falhou (${err?.message}) e fallback falhou (${mockErr?.message})`,
         timestamp: new Date().toISOString(),
       });
     }

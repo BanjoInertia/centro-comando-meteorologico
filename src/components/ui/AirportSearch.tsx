@@ -75,7 +75,6 @@ export default function AirportSearch() {
 
   return (
     <div ref={containerRef} className="relative">
-      {/* Botão de ativação */}
       <button
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
         className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/85 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-all duration-200 backdrop-blur-md shadow-2xl text-xs font-mono"
@@ -86,7 +85,6 @@ export default function AirportSearch() {
         <kbd className="hidden sm:inline text-[8px] bg-slate-800 border border-slate-700 rounded px-1 py-0.5 text-slate-500">⌘K</kbd>
       </button>
 
-      {/* Painel de busca */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -96,7 +94,6 @@ export default function AirportSearch() {
             transition={{ duration: 0.15 }}
             className="absolute top-full mt-2 left-0 w-[340px] z-[9999] bg-[#080f1a]/98 border border-slate-700/80 rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden"
           >
-            {/* Input */}
             <div className="flex items-center gap-2 px-3 py-2.5 border-b border-slate-800">
               <Search className="w-4 h-4 text-indigo-400 flex-shrink-0" />
               <input
@@ -116,7 +113,6 @@ export default function AirportSearch() {
               )}
             </div>
 
-            {/* Resultados */}
             {results.length > 0 ? (
               <ul className="max-h-[300px] overflow-y-auto py-1">
                 {results.map((ap, i) => (
@@ -168,7 +164,6 @@ export default function AirportSearch() {
               </div>
             )}
 
-            {/* Footer com dica de teclado */}
             <div className="flex items-center gap-3 px-3 py-1.5 border-t border-slate-800/60 bg-slate-950/50">
               <span className="text-[8px] text-slate-700 flex items-center gap-1">
                 <kbd className="bg-slate-800 border border-slate-700 rounded px-1">↑↓</kbd> navegar

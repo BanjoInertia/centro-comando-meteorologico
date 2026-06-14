@@ -8,6 +8,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { Airport } from "@/types";
 import { latLonToVector3 } from "@/lib/three/geoUtils";
 import { useStationSelect } from "@/hooks/useStationSelect";
+
 import { Navigation2, X } from "lucide-react";
 
 interface AirportPinProps { airport: Airport; }
@@ -60,20 +61,15 @@ export default function AirportPin({ airport }: AirportPinProps) {
   const setRouteDestination = useAppStore((s) => s.setRouteDestination);
   const clearStation = useAppStore((s) => s.clearStation);
   const flightCategories = useAppStore((s) => s.flightCategories);
+  const projectedFlightCategory = useAppStore((s) => s.projectedFlightCategory);
 
   const isSelected = focusedAirport?.icao === airport.icao;
 
-  const activeMetar = useMemo(() => {
-    if (!isSelected || !selectedStation) return null;
-    const metar = selectedStation.metar;
-    return currentHourOffset === 0
-      ? metar
-      : (selectedStation.briefing?.forecast ? { ...metar, ...selectedStation.briefing.forecast } : metar);
-  }, [isSelected, selectedStation, currentHourOffset]);
+  const activeMetar = isSelected ? selectedStation?.metar : null;
 
   let flightCat = flightCategories[airport.icao];
-  if (isSelected && selectedStation && currentHourOffset > 0) {
-    flightCat = selectedStation.briefing?.flightCategory || flightCat;
+  if (isSelected && currentHourOffset > 0 && projectedFlightCategory) {
+    flightCat = projectedFlightCategory;
   }
 
   const dotColor = categoryColor(flightCat);
@@ -139,17 +135,14 @@ export default function AirportPin({ airport }: AirportPinProps) {
 
   return (
     <>
-      {/* Ponto 3D */}
       <mesh ref={meshRef} position={position} onClick={handleClick}>
         <sphereGeometry args={[isSelected ? 0.008 : 0.005, 8, 8]} />
         <meshBasicMaterial color={dotColor} />
       </mesh>
 
-      {/* HTML overlay */}
       <Html position={position} zIndexRange={isSelected ? [1000, 900] : [100, 0]}>
         <div ref={wrapperRef} style={{ transition: "opacity 0.2s" }}>
 
-          {/* Selected airport HUD */}
           {isSelected && (
             <div
               className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none min-w-[155px]"
@@ -159,7 +152,6 @@ export default function AirportPin({ airport }: AirportPinProps) {
                 className="rounded-xl p-3 flex flex-col gap-2 backdrop-blur-md w-full shadow-2xl min-w-[200px] pointer-events-auto"
                 style={{ background: "rgba(5,11,20,0.95)", border: `1px solid ${dotColor}40`, boxShadow: `0 0 20px ${dotColor}20` }}
               >
-                {/* Time */}
                 <div className="flex flex-col items-center pb-2 border-b border-white/10 relative">
                   <button
                     onClick={(e) => { e.stopPropagation(); clearStation(); }}
@@ -176,7 +168,6 @@ export default function AirportPin({ airport }: AirportPinProps) {
                   </div>
                 </div>
 
-                {/* Weather */}
                 {(activeMetar?.wind || activeMetar?.barometer) && (
                   <div className="flex gap-2 pt-1">
                     {activeMetar?.wind && (
@@ -211,7 +202,6 @@ export default function AirportPin({ airport }: AirportPinProps) {
             </div>
           )}
 
-          {/* ICAO */}
           <div
             className="flex items-center cursor-pointer select-none"
             onClick={handleClick}
@@ -232,7 +222,6 @@ export default function AirportPin({ airport }: AirportPinProps) {
             </span>
           </div>
 
-          {/* Hover */}
           {isHovered && !isSelected && (
             <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap pointer-events-none z-50">
               <div

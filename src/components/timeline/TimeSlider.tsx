@@ -1,15 +1,9 @@
 import React from "react";
 import { useAppStore } from "@/store/useAppStore";
-import { useStationSelect } from "@/hooks/useStationSelect";
 
 export default function TimeSlider() {
   const currentHourOffset = useAppStore((state) => state.timeline.currentHourOffset);
   const setHourOffset = useAppStore((state) => state.setHourOffset);
-  const { updateBriefingForHour } = useStationSelect();
-
-  const handleRelease = () => {
-    updateBriefingForHour(currentHourOffset);
-  };
 
   const marks = [0, 6, 12, 18, 24];
 
@@ -31,12 +25,9 @@ export default function TimeSlider() {
           step="1"
           value={currentHourOffset}
           onChange={(e) => setHourOffset(Number(e.target.value))}
-          onMouseUp={handleRelease}
-          onTouchEnd={handleRelease}
           className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
         />
 
-        {/* Marcadores visuais no slider */}
         <div className="absolute top-4 left-0 right-0 flex justify-between px-[6px] pointer-events-none">
           {marks.map((mark) => (
             <div
