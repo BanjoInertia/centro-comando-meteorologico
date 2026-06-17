@@ -15,12 +15,6 @@
 
 </div>
 
-<!--
-  ================== MÍDIA PRINCIPAL (GIF HERÓI) ==================
-  Substitua o caminho abaixo pelo seu GIF principal (~10-12s):
-  globo girando → clique no pin → painel/briefing de IA → troca de modo.
-  Salve o arquivo em: docs/demo.gif
--->
 <div align="center">
   <img src="docs/demo.gif" alt="Demonstração do globo 3D: clique em aeroporto, briefing de IA e troca de modo de visualização" width="900" />
 </div>
@@ -29,9 +23,9 @@
 
 ## 💡 Sobre o Projeto
 
-Esse projeto nasceu para resolver um problema real de quem trabalha com aviação: condições meteorológicas mudam rápido e dados brutos de METAR/TAF são difíceis de interpretar sob pressão. O **Centro de Comando Meteorológico** transforma esses dados em uma experiência visual — um globo 3D onde cada aeroporto é colorido pela sua categoria de voo (VFR/MVFR/IFR/LIFR), com previsão horária navegável e briefings em linguagem natural gerados por IA.
+METAR e TAF são o padrão mundial pra reportar condições meteorológicas em aeroportos, mas são densos e difíceis de ler rápido por quem não está acostumado. Achei isso um ótimo ponto de partida pra um projeto de portfólio: pegar um dado técnico e cru e transformá-lo numa experiência visual.
 
-Foi construído como projeto pessoal para explorar a interseção entre **visualização 3D no browser**, **engenharia de dados meteorológicos em tempo real** e **integração com LLMs** — três áreas que normalmente não aparecem juntas em um único produto.
+A ideia foi explorar a interseção entre **visualização 3D no browser**, **engenharia de dados em tempo real** e **integração com LLMs** — três áreas que normalmente não aparecem juntas. O resultado é um globo 3D onde cada aeroporto é colorido pela sua categoria de voo, com previsão navegável e briefings gerados por IA.
 
 ---
 
@@ -55,13 +49,6 @@ Algumas escolhas conscientes de trade-off que valem ser explicadas:
 ---
 
 ## ✨ Funcionalidades
-
-<!--
-  ================== GIFs CURTOS DE APOIO ==================
-  Os blocos <img> abaixo são para GIFs curtos (4-6s), um por feature.
-  Mantenha-os FOCADOS em uma coisa só cada. Salve em docs/.
-  Se não for gravar algum, apague o <img> correspondente — não deixe link quebrado.
--->
 
 - 🌍 **Globo 3D interativo** com três modos de renderização: satélite com ciclo dia/noite baseado no horário UTC real, holograma cibernético e mapa térmico.
 
@@ -91,13 +78,6 @@ Algumas escolhas conscientes de trade-off que valem ser explicadas:
 ---
 
 ## 🖼️ Modos de Visualização
-
-<!--
-  ================== PRINTS ESTÁTICOS ==================
-  Os três modos do globo funcionam melhor como prints lado a lado do que como GIF
-  (comparar é mais fácil parado). Tire um print de cada modo e salve em docs/.
-  O print que você já tirou (tela inicial / satélite) entra como o primeiro.
--->
 
 | Satélite | Holograma | Térmico |
 |:---:|:---:|:---:|
@@ -148,13 +128,12 @@ Critérios seguem o padrão aeronáutico (visibilidade em metros, teto em pés a
 
 ### Pré-requisitos
 
-<!-- ⚠️ CONFIRA a versão mínima de Node exigida pelo Next.js 16 e ajuste o número abaixo. -->
 - Node.js 20+
 - npm
 
 ```bash
 # 1. Clonar o repositório
-git clone https://github.com/SEU-USUARIO/centro-comando-meteorologico.git
+git clone https://github.com/BanjoInertia/centro-comando-meteorologico.git
 cd centro-comando-meteorologico
 
 # 2. Instalar dependências
@@ -220,12 +199,11 @@ src/
 
 ## 👤 Autor
 
-Feito por **[Seu Nome]**.
+Feito por **[Marcelo Ramos]**.
 
-<!-- ⚠️ PREENCHA seus links reais. Perfil sem link cheira a projeto inacabado. -->
-- LinkedIn: [seu-usuario](COLOQUE_O_LINK_AQUI)
-- GitHub: [seu-usuario](COLOQUE_O_LINK_AQUI)
-- Portfólio: [seu-site](COLOQUE_O_LINK_AQUI)
+- LinkedIn: [Marcelo Ramos](www.linkedin.com/in/marcelo-ramos-8412202b5)
+- GitHub: [BanjoInertia](https://github.com/BanjoInertia)
+- Portfólio: [Marcelo Ramos](https://portifolio-banjo-inertia.netlify.app)
 
 ---
 

@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
 
     const BATCH_SIZE = 20;
     for (let i = 0; i < icaos.length; i += BATCH_SIZE) {
+      if (i > 0) await new Promise((r) => setTimeout(r, 1100));
       const batch = icaos.slice(i, i + BATCH_SIZE).join(",");
       const res = await fetch(`${CHECKWX_BASE}/metar/${batch}/decoded`, {
         headers: { "X-API-Key": apiKey },

@@ -7,7 +7,7 @@ const SLIDER_DEBOUNCE_MS = 800;
 const ALL_ICAOS = BRAZILIAN_AIRPORTS.map((ap) => ap.icao).join(",");
 
 const ENABLE_INDIVIDUAL_PREFETCH = true;
-const PREFETCH_DELAY_MS = 250;
+const PREFETCH_DELAY_MS = 1100;
 
 function computeCatFromMetar(metar: any): string | null {
   if (!metar) return null;
