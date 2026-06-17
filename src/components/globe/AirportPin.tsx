@@ -72,7 +72,8 @@ export default function AirportPin({ airport }: AirportPinProps) {
     flightCat = projectedFlightCategory;
   }
 
-  const dotColor = categoryColor(flightCat);
+  const baseColor = categoryColor(flightCat);
+  const dotColor = isSelected ? baseColor : "#ffffff";
   const hasCat = !!flightCat;
 
   const position = useMemo(() => latLonToVector3(airport.lat, airport.lon, 1.003), [airport.lat, airport.lon]);
@@ -226,17 +227,17 @@ export default function AirportPin({ airport }: AirportPinProps) {
             <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap pointer-events-none z-50">
               <div
                 className="bg-[#05080f]/98 rounded-xl py-2 px-3 shadow-2xl flex flex-col gap-0.5 min-w-[150px] backdrop-blur-md"
-                style={{ border: `1px solid ${hasCat ? dotColor + "40" : "rgba(255,255,255,0.15)"}` }}
+                style={{ border: `1px solid ${hasCat ? baseColor + "40" : "rgba(255,255,255,0.15)"}` }}
               >
                 <p className="text-[11px] font-bold text-white tracking-wide">{airport.name}</p>
                 <p className="text-[8px] text-slate-400 uppercase tracking-widest">{airport.city} · {airport.country}</p>
                 {flightCat && (
                   <div
                     className="mt-1 flex items-center gap-1.5 rounded-lg px-2 py-1"
-                    style={{ background: `${dotColor}15`, border: `1px solid ${dotColor}30` }}
+                    style={{ background: `${baseColor}15`, border: `1px solid ${baseColor}30` }}
                   >
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor, boxShadow: `0 0 6px ${dotColor}` }} />
-                    <span className="font-mono text-[10px] font-bold" style={{ color: dotColor }}>{flightCat}</span>
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: baseColor, boxShadow: `0 0 6px ${baseColor}` }} />
+                    <span className="font-mono text-[10px] font-bold" style={{ color: baseColor }}>{flightCat}</span>
                     <span className="text-[8px] text-slate-400">
                       {flightCat === "VFR" && "Condições visuais"}
                       {flightCat === "MVFR" && "VFR marginal"}
