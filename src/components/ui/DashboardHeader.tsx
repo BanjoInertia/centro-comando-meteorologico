@@ -59,9 +59,8 @@ export default function DashboardHeader() {
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
             </div>
             <div className="flex flex-col">
-              <h1 className="text-xs font-black tracking-widest text-slate-100 flex items-center gap-1.5 font-mono">
-                <span>AERO WEATHER</span>
-                <span className="text-[9px] font-medium text-indigo-400 font-sans px-1 rounded bg-indigo-500/10 border border-indigo-500/20">CMD</span>
+              <h1 className="text-[10px] font-black tracking-widest text-slate-100 flex items-center gap-1.5 font-mono">
+                <span>CONTROLE METEOROLÓGICO</span>
               </h1>
               <span className="text-[8px] text-slate-400 font-mono tracking-wider">
                 {selectedStation ? `FOCUS: ${selectedStation.airport.icao}` : "SELECIONE UMA ESTAÇÃO"}
@@ -78,7 +77,7 @@ export default function DashboardHeader() {
                 exit={{ opacity: 0, y: -4, transition: { duration: 0.5 } }}
                 className="bg-slate-950/90 border border-indigo-500/20 rounded-xl px-4 py-3 shadow-2xl backdrop-blur-md pointer-events-auto w-full"
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between gap-4 mb-2">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse flex-shrink-0" />
                     <span className="text-[10px] font-mono font-bold text-indigo-300 tracking-widest uppercase">
@@ -101,13 +100,40 @@ export default function DashboardHeader() {
                 </p>
               </motion.div>
             )}
+            {showWindLayer && !windLayer && (
+              <motion.div
+                key="wind-loading-bar"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4, transition: { duration: 0.4 } }}
+                className="bg-slate-950/90 border border-sky-500/20 rounded-xl px-4 py-3 shadow-2xl backdrop-blur-md pointer-events-auto w-full"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse flex-shrink-0" />
+                  <span className="text-[10px] font-mono font-bold text-sky-300 tracking-widest uppercase">
+                    Carregando Camada de Vento
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full bg-gradient-to-r from-sky-500 to-cyan-400"
+                    animate={{ x: ["0%", "100%", "0%"] }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                    style={{ width: "40%" }}
+                  />
+                </div>
+                <p className="text-[9px] font-mono text-slate-500 mt-1.5">
+                  Buscando dados Open-Meteo...
+                </p>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
 
         <div className="flex items-center gap-1 bg-slate-950/90 border border-slate-800 rounded-xl p-1 shadow-2xl backdrop-blur-md pointer-events-auto">
           <button
             onClick={() => setGlobeStyle("satellite")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[11px] font-bold tracking-wider transition-all duration-300 cursor-pointer border ${globeStyle === "satellite"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[9px] font-bold tracking-wider leading-none transition-all duration-300 cursor-pointer border ${globeStyle === "satellite"
               ? "bg-indigo-500/20 border-indigo-500/50 text-indigo-300 shadow-[0_0_10px_rgba(99,102,241,0.15)]"
               : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
               }`}
@@ -119,7 +145,7 @@ export default function DashboardHeader() {
 
           <button
             onClick={() => setGlobeStyle("vector")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[11px] font-bold tracking-wider transition-all duration-300 cursor-pointer border ${globeStyle === "vector"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[9px] font-bold tracking-wider leading-none transition-all duration-300 cursor-pointer border ${globeStyle === "vector"
               ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
               : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
               }`}
@@ -131,7 +157,7 @@ export default function DashboardHeader() {
 
           <button
             onClick={() => setGlobeStyle("thermal")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[11px] font-bold tracking-wider transition-all duration-300 cursor-pointer border ${globeStyle === "thermal"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[9px] font-bold tracking-wider leading-none transition-all duration-300 cursor-pointer border ${globeStyle === "thermal"
               ? "bg-rose-500/20 border-rose-500/50 text-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.15)]"
               : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
               }`}
@@ -145,7 +171,7 @@ export default function DashboardHeader() {
 
           <button
             onClick={toggleWindLayer}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[11px] font-bold tracking-wider transition-all duration-300 cursor-pointer border relative ${showWindLayer
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[9px] font-bold tracking-wider leading-none transition-all duration-300 cursor-pointer border relative ${showWindLayer
               ? "bg-sky-500/20 border-sky-500/50 text-sky-300 shadow-[0_0_10px_rgba(14,165,233,0.2)]"
               : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/50"
               }`}
@@ -198,7 +224,7 @@ export default function DashboardHeader() {
               <span className="text-[10px] font-bold tracking-widest uppercase">
                 {isProjecting ? "PROJEÇÃO DE PREVISÃO" : "MONITORAMENTO REAL"}
               </span>
-              <span className="text-[11px] font-extrabold">
+              <span className="text-[9px] font-extrabold">
                 {isProjecting ? `+${currentHourOffset} HORAS A FRENTE` : "TEMPO REAL (UTC)"}
               </span>
             </div>

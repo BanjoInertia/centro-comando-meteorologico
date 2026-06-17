@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateWeatherBriefing } from "@/lib/gemini/client";
+import { generateWeatherBriefing } from "@/lib/groq/client";
 import { MetarData, TafData, WeatherAlert, AlertLevel } from "@/types";
 
 export async function POST(req: NextRequest) {
