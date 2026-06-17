@@ -10,8 +10,7 @@
 ![Three.js](https://img.shields.io/badge/Three.js-0.184-black?logo=three.js)
 ![Tailwind](https://img.shields.io/badge/Tailwind-4-38BDF8?logo=tailwindcss)
 
-<!-- ⚠️ PREENCHA estes dois links antes de publicar. O de demo é o mais importante. -->
-[🔗 Demo ao vivo](COLOQUE_O_LINK_DO_DEPLOY_AQUI) · [📂 Código-fonte](COLOQUE_O_LINK_DO_REPO_AQUI)
+[🔗 Demo ao vivo](https://centro-comando-meteorologico.onrender.com)
 
 </div>
 
