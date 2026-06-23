@@ -48,6 +48,7 @@ export default function GlobeScene() {
       gl={{ antialias: true }}
       style={{ background: "#050b14" }}
       onContextMenu={(e) => { e.preventDefault(); clearStation(); }}
+      onPointerMissed={() => { if (focusedAirport) clearStation(); }}
     >
       <ambientLight intensity={25} color="#0d1b2a" />
       <directionalLight position={sunPosition} intensity={4} color="#fffdf0" />
